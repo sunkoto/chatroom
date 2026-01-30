@@ -126,9 +126,15 @@
         let wsPath = '/ws';
         // 检查是否有路径前缀（反向代理场景）
         const pathname = window.location.pathname;
-        if (pathname && pathname !== '/' && !pathname.endsWith('/ws')) {
-            // 移除末尾斜杠并添加/ws
-            wsPath = pathname.replace(/\/$/, '') + '/ws';
+        if (pathname && pathname !== '/') {
+            // 移除 index.html 后缀（如果存在）
+            let basePath = pathname.replace(/\/index\.html$/, '');
+            // 移除末尾斜杠
+            basePath = basePath.replace(/\/$/, '');
+            // 如果路径不是根路径，则添加 /ws
+            if (basePath !== '') {
+                wsPath = basePath + '/ws';
+            }
         }
         const ws = new WebSocket(`${wsProtocol}//${window.location.host}${wsPath}`);
 

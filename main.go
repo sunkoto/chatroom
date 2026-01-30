@@ -23,8 +23,9 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true // 允许跨域，生产可限制域名
 	},
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024, // 增加缓冲区，防止断连
+	ReadBufferSize:   1024,
+	WriteBufferSize:  1024, // 增加缓冲区，防止断连
+	HandshakeTimeout: 10 * time.Second,
 }
 
 // 太平洋网络IP接口返回结构体（JSON格式）
@@ -236,6 +237,26 @@ func (s *ChatServer) Broadcaster() {
 	}
 }
 
+// 获取真实客户端IP（支持反向代理）
+func getRealClientIP(r *http.Request) string {
+	// 优先从 X-Forwarded-For 获取（反向代理场景）
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// X-Forwarded-For 可能包含多个IP，取第一个
+		if idx := strings.Index(xff, ","); idx != -1 {
+			return strings.TrimSpace(xff[:idx])
+		}
+		return strings.TrimSpace(xff)
+	}
+
+	// 其次从 X-Real-IP 获取
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return strings.TrimSpace(xri)
+	}
+
+	// 最后使用 RemoteAddr（直接连接场景）
+	return r.RemoteAddr
+}
+
 // 处理单个WebSocket客户端连接（加固错误处理，防止解析失败导致断连）
 func (s *ChatServer) HandleClient(w http.ResponseWriter, r *http.Request) {
 	// 添加 CORS 支持
@@ -261,7 +282,7 @@ func (s *ChatServer) HandleClient(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	// 提取客户端纯IP（优化解析，兼容IPv6和带端口的IP）
-	clientIP := r.RemoteAddr
+	clientIP := getRealClientIP(r)
 
 	// 处理IPv6地址格式 [2001:db8::1]:12345
 	if strings.Contains(clientIP, "[") && strings.Contains(clientIP, "]") {
