@@ -103,13 +103,23 @@
         
         // 生成随机颜色函数
         function getRandomColor() {
-            const colors = [
-                "#00ff00", "#00ffff", "#ff0000", "#ff00ff", "#ffff00", "#0000ff", "#ff6600", "#9933ff",
-                "#33ff99", "#ff3399", "#3399ff", "#ffcc00", "#00ccff", "#ff9900", "#66ff33", "#cc00ff",
-                "#ff3333", "#33ffcc", "#ffcc33", "#9966ff", "#33ccff", "#ff66b3", "#66ff99", "#ff99cc",
-                "#66ccff", "#ffcc66", "#99ffcc", "#cc66ff", "#ff3366", "#3366ff"
-            ];
-            return colors[Math.floor(Math.random() * colors.length)];
+            const predefinedColors = ['#00ff00', '#00ffff', '#ff0000', '#ff00ff', '#ffff00', '#0000ff'];
+            return predefinedColors[Math.floor(Math.random() * predefinedColors.length)];
+        }
+        
+        function isValidColor(color) {
+            if (!color || typeof color !== 'string') return false;
+            
+            const trimmedColor = color.trim();
+            
+            if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(trimmedColor)) return true;
+            
+            if (/^rgb(a)?\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*(,\s*[\d.]+\s*)?\)$/.test(trimmedColor)) return true;
+            
+            const predefinedColors = ['red', 'green', 'blue', 'yellow', 'cyan', 'magenta', 'white', 'black', 'gray', 'orange', 'purple', 'pink', 'brown', 'lime', 'navy', 'teal', 'olive', 'maroon', 'aqua', 'fuchsia', 'silver'];
+            if (predefinedColors.includes(trimmedColor.toLowerCase())) return true;
+            
+            return false;
         }
         // 建立WebSocket连接（连接Go后端）
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -138,46 +148,43 @@
                     addMsg('', msg.content, 'msg-welcome');
                     break;
                 case 'join':
-                    // 用户加入：根据用户颜色显示+时间
                     const joinElement = document.createElement('div');
                     const joinPrefix = `[${msg.time}]`;
-                    const joinContent = msg.content.replace(/\n/g, '<br>');
-                    joinElement.innerHTML = `${joinPrefix}：${joinContent}`;
+                    joinElement.textContent = `${joinPrefix}：${msg.content}`;
                     joinElement.className = 'msg-join';
-                    if (msg.color) {
+                    if (msg.color && isValidColor(msg.color)) {
                         joinElement.style.color = msg.color;
                     } else {
                         joinElement.style.color = systemColor;
                     }
+                    joinElement.style.whiteSpace = 'pre-wrap';
                     chatContainer.appendChild(joinElement);
                     break;
                 case 'leave':
-                    // 用户离开：根据用户颜色显示+时间
                     const leaveElement = document.createElement('div');
                     const leavePrefix = `[${msg.time}]`;
-                    const leaveContent = msg.content.replace(/\n/g, '<br>');
-                    leaveElement.innerHTML = `${leavePrefix}：${leaveContent}`;
+                    leaveElement.textContent = `${leavePrefix}：${msg.content}`;
                     leaveElement.className = 'msg-leave';
-                    if (msg.color) {
+                    if (msg.color && isValidColor(msg.color)) {
                         leaveElement.style.color = msg.color;
                     } else {
                         leaveElement.style.color = systemColor;
                     }
+                    leaveElement.style.whiteSpace = 'pre-wrap';
                     chatContainer.appendChild(leaveElement);
                     break;
                 case 'chat':
-                    // 普通聊天：根据用户颜色显示，格式：[时间] IP|城市|ID：内容
                     const chatElement = document.createElement('div');
                     const time = `[${msg.time}]`;
                     const ip = msg.ip;
                     const region = msg.region;
                     const userId = msg.userId;
-                    const content = msg.content.replace(/\n/g, '<br>');
-                    chatElement.innerHTML = `${time} ${ip} | ${region} | ${userId}：${content}`;
+                    chatElement.textContent = `${time} ${ip} | ${region} | ${userId}：${msg.content}`;
                     chatElement.className = 'msg-chat';
-                    if (msg.color) {
+                    if (msg.color && isValidColor(msg.color)) {
                         chatElement.style.color = msg.color;
                     }
+                    chatElement.style.whiteSpace = 'pre-wrap';
                     chatContainer.appendChild(chatElement);
                     break;
                 case 'online':
@@ -192,11 +199,11 @@
                     // 系统通知：使用加粗红色字体
                     const systemElement = document.createElement('div');
                     const systemPrefix = `[${msg.time}]`;
-                    const systemContent = msg.content.replace(/\n/g, '<br>');
-                    systemElement.innerHTML = `${systemPrefix}：${systemContent}`;
+                    systemElement.textContent = `${systemPrefix}：${msg.content}`;
                     systemElement.className = 'msg-system';
                     systemElement.style.color = '#ff0000';
                     systemElement.style.fontWeight = 'bold';
+                    systemElement.style.whiteSpace = 'pre-wrap';
                     chatContainer.appendChild(systemElement);
                     break;
                 case 'color':
@@ -267,16 +274,14 @@
             msgInput.focus();
         });
 
-        // 工具函数：添加消息到显示区域（处理换行符\n→<br>，保持终端排版）
+        // 工具函数：添加消息到显示区域（处理换行符，保持终端排版）
         function addMsg(prefix, content, className) {
             const msgDiv = document.createElement('div');
-            // 处理终端换行符，适配网页显示
-            content = content.replace(/\n/g, '<br>');
             // 拼接前缀（时间/IP等）
             if (prefix) {
-                msgDiv.innerHTML = `${prefix}：${content}`;
+                msgDiv.textContent = `${prefix}：${content}`;
             } else {
-                msgDiv.innerHTML = content;
+                msgDiv.textContent = content;
             }
             // 添加对应样式类，实现彩色显示
             msgDiv.className = className;
@@ -284,6 +289,8 @@
             if (className !== 'msg-chat') {
                 msgDiv.style.color = systemColor;
             }
+            // 保留换行符
+            msgDiv.style.whiteSpace = 'pre-wrap';
             chatContainer.appendChild(msgDiv);
         }
 
