@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,7 +22,10 @@ import (
 // 升级HTTP连接为WebSocket连接
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
-		return true // 允许跨域，生产可限制域名
+		// 开发环境：允许所有跨域请求
+		// 生产环境建议：限制为特定域名，例如：
+		// return r.Host == "yourdomain.com" || r.Host == "www.yourdomain.com"
+		return true
 	},
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024, // 增加缓冲区，防止断连
@@ -104,6 +108,28 @@ var colors = []string{
 	"#cc66ff", // 淡紫色
 	"#ff3366", // 玫红色
 	"#3366ff", // 深蓝色
+}
+
+// HTML 转义函数，防止 XSS 攻击
+func escapeHTML(s string) string {
+	var buf bytes.Buffer
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '&':
+			buf.WriteString("&amp;")
+		case '<':
+			buf.WriteString("&lt;")
+		case '>':
+			buf.WriteString("&gt;")
+		case '"':
+			buf.WriteString("&quot;")
+		case '\'':
+			buf.WriteString("&#039;")
+		default:
+			buf.WriteByte(s[i])
+		}
+	}
+	return buf.String()
 }
 
 // 处理IP地址的隐私显示
@@ -333,6 +359,8 @@ func (s *ChatServer) HandleClient(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// 过滤特殊字符，防止乱码和注入
 		userID = strings.ReplaceAll(strings.ReplaceAll(customID, "\n", ""), "\r", "")
+		// HTML 转义，防止 XSS 攻击
+		userID = escapeHTML(userID)
 	}
 	// 生成随机颜色
 	color := s.generateRandomColor()
@@ -583,7 +611,8 @@ func (s *ChatServer) HandleClient(w http.ResponseWriter, r *http.Request) {
 			// 普通群聊消息，过滤空内容
 			if inputContent != "" {
 				msg.Type = "chat"
-				msg.Content = inputContent
+				// HTML 转义，防止 XSS 攻击
+				msg.Content = escapeHTML(inputContent)
 				s.broadcast <- msg
 			}
 		}
@@ -597,7 +626,7 @@ func (s *ChatServer) ServeIndex(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	// ====================== 请确认你的固定登录密码 ======================
-	fixedPassword := "123" // 可直接修改为你需要的密码，如admin/666666
+	fixedPassword := "ChatRoom2026!" // 可直接修改为你需要的密码，建议使用包含大小写字母、数字和特殊字符的复杂密码
 	// =====================================================================
 
 	// 初始化聊天室

@@ -30,6 +30,8 @@
             overflow-y: auto;
             line-height: 1.5;
             font-size: 14px;
+            white-space: pre-wrap;
+            word-break: break-word;
         }
         /* 滚动条样式：适配终端黑底 */
         #chat-container::-webkit-scrollbar {
@@ -141,8 +143,7 @@
                     // 用户加入：根据用户颜色显示+时间
                     const joinElement = document.createElement('div');
                     const joinPrefix = `[${msg.time}]`;
-                    const joinContent = msg.content.replace(/\n/g, '<br>');
-                    joinElement.innerHTML = `${joinPrefix}：${joinContent}`;
+                    joinElement.textContent = `${joinPrefix}：${msg.content}`;
                     joinElement.className = 'msg-join';
                     if (msg.color) {
                         joinElement.style.color = msg.color;
@@ -155,8 +156,7 @@
                     // 用户离开：根据用户颜色显示+时间
                     const leaveElement = document.createElement('div');
                     const leavePrefix = `[${msg.time}]`;
-                    const leaveContent = msg.content.replace(/\n/g, '<br>');
-                    leaveElement.innerHTML = `${leavePrefix}：${leaveContent}`;
+                    leaveElement.textContent = `${leavePrefix}：${msg.content}`;
                     leaveElement.className = 'msg-leave';
                     if (msg.color) {
                         leaveElement.style.color = msg.color;
@@ -172,8 +172,7 @@
                     const ip = msg.ip;
                     const region = msg.region;
                     const userId = msg.userId;
-                    const content = msg.content.replace(/\n/g, '<br>');
-                    chatElement.innerHTML = `${time} ${ip} | ${region} | ${userId}：${content}`;
+                    chatElement.textContent = `${time} ${ip} | ${region} | ${userId}：${msg.content}`;
                     chatElement.className = 'msg-chat';
                     if (msg.color) {
                         chatElement.style.color = msg.color;
@@ -192,8 +191,7 @@
                     // 系统通知：使用加粗红色字体
                     const systemElement = document.createElement('div');
                     const systemPrefix = `[${msg.time}]`;
-                    const systemContent = msg.content.replace(/\n/g, '<br>');
-                    systemElement.innerHTML = `${systemPrefix}：${systemContent}`;
+                    systemElement.textContent = `${systemPrefix}：${msg.content}`;
                     systemElement.className = 'msg-system';
                     systemElement.style.color = '#ff0000';
                     systemElement.style.fontWeight = 'bold';
@@ -267,16 +265,14 @@
             msgInput.focus();
         });
 
-        // 工具函数：添加消息到显示区域（处理换行符\n→<br>，保持终端排版）
+        // 工具函数：添加消息到显示区域（处理换行符，保持终端排版）
         function addMsg(prefix, content, className) {
             const msgDiv = document.createElement('div');
-            // 处理终端换行符，适配网页显示
-            content = content.replace(/\n/g, '<br>');
             // 拼接前缀（时间/IP等）
             if (prefix) {
-                msgDiv.innerHTML = `${prefix}：${content}`;
+                msgDiv.textContent = `${prefix}：${content}`;
             } else {
-                msgDiv.innerHTML = content;
+                msgDiv.textContent = content;
             }
             // 添加对应样式类，实现彩色显示
             msgDiv.className = className;
