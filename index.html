@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSH//root@121.140.110.199</title>
+    <style>
+        /* 全局终端样式：黑底、等宽字体、无滚动条 */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Consolas", "Monaco", "Courier New", monospace; /* 终端等宽字体 */
+        }
+        body {
+            background: #000000; /* 终端黑底 */
+            color: #00ff00; /* 终端绿主色 */
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            padding: 10px;
+        }
+        /* 消息显示区域：模拟终端输出 */
+        #chat-container {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #333333;
+            margin-bottom: 10px;
+            overflow-y: auto;
+            line-height: 1.5;
+            font-size: 14px;
+        }
+        /* 滚动条样式：适配终端黑底 */
+        #chat-container::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        #chat-container::-webkit-scrollbar-thumb {
+            background: #333333;
+            border-radius: 4px;
+        }
+        #chat-container::-webkit-scrollbar-track {
+            background: #000000;
+        }
+        /* 输入区域：模拟终端命令行 */
+        #input-container {
+            display: flex;
+            align-items: center;
+            border: 1px solid #333333;
+            padding: 8px 10px;
+            background: #000000;
+        }
+        /* 终端提示符：[root@chat ~]# */
+        #prompt {
+            color: #00ffff; /* 青色提示符 */
+            font-weight: bold;
+            margin-right: 8px;
+            user-select: none;
+        }
+        /* 输入框：无样式，贴合终端 */
+        #msg-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #00ff00;
+            font-size: 14px;
+            caret-color: #00ff00; /* 光标绿色 */
+        }
+        /* 不同类型消息的彩色样式（升级：适配登录/密码/ID设置） */
+        .msg-password { color: #ffff00; }  /* 密码验证-黄色 */
+        .msg-setid { color: #00ffff; }     /* ID设置-青色 */
+        .msg-welcome { color: #00ff00; }   /* 欢迎消息-终端绿 */
+        .msg-join { color: #00ff00; }      /* 加入消息-终端绿 */
+        .msg-leave { color: #ff0000; }     /* 离开消息-红色 */
+        .msg-chat { color: #ffffff; }      /* 聊天消息-白色（更醒目） */
+        .msg-online { color: #ffff00; }    /* 在线列表-黄色 */
+        .msg-help { color: #00ffff; }      /* 帮助信息-青色 */
+        .msg-time { color: #888888; }      /* 时间-灰色 */
+        .msg-success { color: #00ff00; }   /* 成功提示-绿色 */
+        .msg-error { color: #ff0000; }     /* 错误提示-红色 */
+    </style>
+</head>
+<body>
+    <!-- 消息显示区域 -->
+    <div id="chat-container"></div>
+    <!-- 输入区域：终端提示符+输入框 -->
+    <div id="input-container">
+        <span id="prompt">[root@chat ~]#</span>
+        <input type="text" id="msg-input" placeholder="等待服务器验证...">
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const chatContainer = document.getElementById('chat-container');
+        const msgInput = document.getElementById('msg-input');
+        const prompt = document.getElementById('prompt');
+        // 建立WebSocket连接（连接Go后端）
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${wsProtocol}//${window.location.host}/ws`);
+
+        // 1. 连接成功回调
+        ws.onopen = function() {
+            addMsg('系统', '已连接到服务器，等待验证...', 'msg-password');
+            msgInput.placeholder = "请输入密码/ID/消息，回车发送";
+        };
+
+        // 2. 接收后端消息（核心：适配登录/密码/ID/普通消息）
+        ws.onmessage = function(event) {
+            const msg = JSON.parse(event.data);
+            switch (msg.type) {
+                case 'password':
+                    // 密码验证阶段：黄色提示，错误标红
+                    if (msg.content.includes("❌")) {
+                        addMsg(`[${msg.time}]`, msg.content, 'msg-error');
+                    } else if (msg.content.includes("✅")) {
+                        addMsg(`[${msg.time}]`, msg.content, 'msg-success');
+                    } else {
+                        addMsg(`[${msg.time}]`, msg.content, 'msg-password');
+                    }
+                    break;
+                case 'setid':
+                    // ID设置阶段：青色提示
+                    addMsg(`[${msg.time}]`, msg.content, 'msg-setid');
+                    break;
+                case 'welcome':
+                    // 登录成功欢迎消息：绿色
+                    addMsg('', msg.content, 'msg-welcome');
+                    break;
+                case 'join':
+                    // 用户加入：绿色+时间
+                    addMsg(`[${msg.time}]`, msg.content, 'msg-join');
+                    break;
+                case 'leave':
+                    // 用户离开：红色+时间
+                    addMsg(`[${msg.time}]`, msg.content, 'msg-leave');
+                    break;
+                case 'chat':
+                    // 普通聊天：白色（醒目），格式：[时间] IP|归属地|ID：内容
+                    addMsg(`[${msg.time}] ${msg.ip} | ${msg.region} | ${msg.userId}`, msg.content, 'msg-chat');
+                    break;
+                case 'online':
+                    // 在线列表：黄色
+                    addMsg('', msg.content, 'msg-online');
+                    break;
+                case 'help':
+                    // 帮助信息：青色
+                    addMsg(`[${msg.time}]`, msg.content, 'msg-help');
+                    break;
+            }
+            // 自动滚动到底部，保持最新消息可见
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        };
+
+        // 3. 连接关闭回调
+        ws.onclose = function() {
+            addMsg('系统', '与服务器断开连接，请刷新页面重新登录', 'msg-leave');
+            prompt.style.color = '#ff0000'; // 提示符变红
+            msgInput.disabled = true;
+        };
+
+        // 4. 连接错误回调
+        ws.onerror = function(err) {
+            addMsg('错误', '连接服务器失败，请检查后端是否运行', 'msg-leave');
+            prompt.style.color = '#ff0000';
+            msgInput.disabled = true;
+        };
+
+        // 5. 回车发送内容（密码/ID/消息通用）
+        msgInput.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                const content = this.value.trim();
+                if (content === '') return;
+                // 发送JSON内容到后端（统一格式，后端区分类型）
+                ws.send(JSON.stringify({
+                    content: content,
+                    type: 'normal'
+                }));
+                // 清空输入框
+                this.value = '';
+                // 若为退出命令，主动关闭连接
+                if (content === '/exit' || content === '/quit') {
+                    ws.close();
+                    prompt.style.color = '#ff0000';
+                }
+            }
+        });
+
+        // 工具函数：添加消息到显示区域（处理换行符\n→<br>，保持终端排版）
+        function addMsg(prefix, content, className) {
+            const msgDiv = document.createElement('div');
+            // 处理终端换行符，适配网页显示
+            content = content.replace(/\n/g, '<br>');
+            // 拼接前缀（时间/IP等），前缀加灰色样式
+            if (prefix) {
+                msgDiv.innerHTML = `<span class="msg-time">${prefix}</span>：${content}`;
+            } else {
+                msgDiv.innerHTML = content;
+            }
+            // 添加对应样式类，实现彩色显示
+            msgDiv.className = className;
+            chatContainer.appendChild(msgDiv);
+        }
+
+        // 页面关闭时，主动关闭WebSocket连接
+        window.onbeforeunload = function() {
+            ws.close();
+        };
+    </script>
+</body>
+</html>
